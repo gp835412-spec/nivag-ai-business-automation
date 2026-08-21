@@ -1,0 +1,16 @@
+fastapi
+uvicorn[standard]
+sqlalchemy
+alembic
+psycopg[binary,pool]
+pydantic
+pydantic-settings
+pyjwt[crypto]
+pwdlib[argon2]
+redis
+celery
+httpx
+python-multipart
+email-validator
+pytest
+pytest-asyncio
