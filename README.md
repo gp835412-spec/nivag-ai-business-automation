@@ -1,25 +1,4 @@
-# NIVAG AI Business Automation
-
-A production-oriented multi-tenant backend for an AI-powered business automation platform.
-
-Built with FastAPI, SQLAlchemy, PostgreSQL, Alembic, JWT authentication, and a clean layered architecture.
-
-## Features
-
-- Multi-tenant organization architecture
-- Organization registration and management
-- Owner and user management
-- JWT-based authentication
-- Secure password hashing and verification
-- Role-based authorization
-- Organization-scoped data isolation
-- Repository and service layer architecture
-- Database migrations with Alembic
-- Automated API, service, and repository testing
-
-## Architecture
-
-```text
+Architecture
 API Router
     ↓
 Service Layer
@@ -27,7 +6,6 @@ Service Layer
 Repository Layer
     ↓
 Database Layer
-
 
 The architecture separates HTTP handling, business logic, database access, and security responsibilities.
 
@@ -82,3 +60,41 @@ License
 This project is provided as a portfolio and technical demonstration project.
 
 All rights reserved.
+
+
+Future Development
+
+The current implementation establishes the core backend foundation for the platform.
+
+Future development will extend the system with additional modules and capabilities, including:
+
+AI-powered business automation
+Workflow automation
+AI agents and intelligent task execution
+CRM and customer management
+Lead capture and lead automation
+Business integrations
+Notification and communication systems
+Business intelligence and analytics
+Automation monitoring and execution tracking
+Additional organization and user management capabilities
+
+The architecture is designed to allow these modules to evolve independently while maintaining clear separation between API handling, business logic, persistence, security, and future automation components.
+
+Development Approach
+
+The project follows a modular and test-driven development approach.
+
+New capabilities are intended to be added through clearly defined application layers:
+
+API Layer
+    ↓
+Application / Service Layer
+    ↓
+Domain Logic
+    ↓
+Repository Layer
+    ↓
+Database / External Integrations
+
+This approach is intended to keep the codebase maintainable as the platform grows from its current multi-tenant backend foundation into a broader AI business automation system.
