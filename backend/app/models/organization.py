@@ -1,5 +1,6 @@
 """
 NIVAG AI Business Automation
+
 Organization Model
 
 Tenant root entity for the multi-tenant business platform.
@@ -9,7 +10,6 @@ from __future__ import annotations
 
 from enum import StrEnum
 from typing import TYPE_CHECKING
-from uuid import UUID
 
 from sqlalchemy import String, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
@@ -18,6 +18,7 @@ from app.db.base.base import Base
 from app.db.base.model_mixins import TimestampMixin, UUIDPrimaryKeyMixin
 
 if TYPE_CHECKING:
+    from app.models.company import Company
     from app.models.user import User
 
 
@@ -37,8 +38,8 @@ class Organization(
     """
     Represents an independent business tenant.
 
-    All tenant-owned resources will reference this entity
-    through organization_id.
+    All tenant-owned resources reference this entity through
+    organization_id.
     """
 
     __tablename__ = "organizations"
@@ -104,6 +105,14 @@ class Organization(
 
     users: Mapped[list["User"]] = relationship(
         "User",
+        back_populates="organization",
+        cascade="all, delete-orphan",
+        passive_deletes=True,
+        lazy="raise",
+    )
+
+    companies: Mapped[list["Company"]] = relationship(
+        "Company",
         back_populates="organization",
         cascade="all, delete-orphan",
         passive_deletes=True,

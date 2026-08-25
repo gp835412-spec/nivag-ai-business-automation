@@ -24,12 +24,9 @@ def _build_async_database_url(database_url: str) -> str:
     Convert the configured PostgreSQL URL to SQLAlchemy's
     async psycopg driver URL.
     """
+
     if database_url.startswith("postgresql+psycopg://"):
-        return database_url.replace(
-            "postgresql+psycopg://",
-            "postgresql+psycopg://",
-            1,
-        )
+        return database_url
 
     if database_url.startswith("postgresql://"):
         return database_url.replace(
@@ -43,7 +40,10 @@ def _build_async_database_url(database_url: str) -> str:
     )
 
 
-DATABASE_URL = _build_async_database_url(settings.database_url)
+DATABASE_URL = _build_async_database_url(
+    settings.database_url,
+)
+
 
 engine: AsyncEngine = create_async_engine(
     DATABASE_URL,
@@ -51,6 +51,7 @@ engine: AsyncEngine = create_async_engine(
     pool_pre_ping=True,
     pool_recycle=1800,
 )
+
 
 AsyncSessionLocal = async_sessionmaker(
     bind=engine,
@@ -65,14 +66,32 @@ async def get_db_session() -> AsyncGenerator[AsyncSession, None]:
     """
     Provide a request-scoped asynchronous database session.
 
-    The session is always closed when the dependency lifecycle ends.
+    Successful requests commit their database transaction.
+    Failed requests are rolled back before the exception
+    propagates to the application.
     """
+
     async with AsyncSessionLocal() as session:
-        yield session
+        try:
+            yield session
+            await session.commit()
+        except Exception:
+            await session.rollback()
+            raise
 
 
 async def dispose_database() -> None:
     """
     Dispose the SQLAlchemy engine during application shutdown.
     """
+
     await engine.dispose()
+
+
+__all__ = [
+    "AsyncSessionLocal",
+    "DATABASE_URL",
+    "dispose_database",
+    "engine",
+    "get_db_session",
+]
