@@ -17,6 +17,7 @@ from sqlalchemy.ext.asyncio import async_engine_from_config
 from app.core.config import settings
 from app.db.base.base import Base
 from app.models.company import Company  # noqa: F401
+from app.models.contact import Contact  # noqa: F401
 from app.models.organization import Organization  # noqa: F401
 from app.models.user import User  # noqa: F401
 

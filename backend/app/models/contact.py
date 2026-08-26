@@ -2,9 +2,12 @@
 ==========================================================
 NIVAG AI Business Automation
 
-Company Model
+Contact Model
 
-Tenant-scoped CRM company entity.
+Tenant-scoped CRM contact entity.
+
+A contact always belongs to an organization and may
+optionally be associated with a company.
 
 Author:
 NIVAG
@@ -38,38 +41,42 @@ from app.db.base.model_mixins import (
 )
 
 if TYPE_CHECKING:
-    from app.models.contact import Contact
+    from app.models.company import Company
     from app.models.organization import Organization
 
 
-class Company(
+class Contact(
     UUIDPrimaryKeyMixin,
     TimestampMixin,
     Base,
 ):
     """
-    Represents a CRM company inside an organization.
+    Represents a CRM contact inside an organization.
 
-    Every company belongs to exactly one organization.
+    Every contact belongs to exactly one organization.
+
+    A contact may optionally be associated with a company
+    belonging to the same organization.
     """
 
-    __tablename__ = "companies"
+    __tablename__ = "contacts"
 
     __table_args__ = (
         Index(
-            "ix_companies_organization_email",
+            "ix_contacts_organization_email",
             "organization_id",
             "email",
         ),
         Index(
-            "ix_companies_organization_name",
+            "ix_contacts_organization_name",
             "organization_id",
-            "name",
+            "last_name",
+            "first_name",
         ),
         Index(
-            "ix_companies_organization_website",
+            "ix_contacts_organization_company_id",
             "organization_id",
-            "website",
+            "company_id",
         ),
     )
 
@@ -82,13 +89,22 @@ class Company(
         index=True,
     )
 
-    name: Mapped[str] = mapped_column(
-        String(200),
+    company_id: Mapped[UUID | None] = mapped_column(
+        ForeignKey(
+            "companies.id",
+            ondelete="SET NULL",
+        ),
+        nullable=True,
+        index=True,
+    )
+
+    first_name: Mapped[str] = mapped_column(
+        String(100),
         nullable=False,
     )
 
-    legal_name: Mapped[str | None] = mapped_column(
-        String(250),
+    last_name: Mapped[str | None] = mapped_column(
+        String(100),
         nullable=True,
     )
 
@@ -102,12 +118,12 @@ class Company(
         nullable=True,
     )
 
-    website: Mapped[str | None] = mapped_column(
-        String(500),
+    job_title: Mapped[str | None] = mapped_column(
+        String(150),
         nullable=True,
     )
 
-    industry: Mapped[str | None] = mapped_column(
+    department: Mapped[str | None] = mapped_column(
         String(150),
         nullable=True,
     )
@@ -149,18 +165,17 @@ class Company(
 
     organization: Mapped["Organization"] = relationship(
         "Organization",
-        back_populates="companies",
+        back_populates="contacts",
         lazy="raise",
     )
 
-    contacts: Mapped[list["Contact"]] = relationship(
-        "Contact",
-        back_populates="company",
-        passive_deletes=True,
+    company: Mapped["Company | None"] = relationship(
+        "Company",
+        back_populates="contacts",
         lazy="raise",
     )
 
 
 __all__ = [
-    "Company",
+    "Contact",
 ]
