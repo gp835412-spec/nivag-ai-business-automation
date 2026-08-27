@@ -42,7 +42,7 @@ if TYPE_CHECKING:
     from app.models.lead import Lead
     from app.models.opportunity import Opportunity
     from app.models.organization import Organization
-
+    from app.models.activity import Activity
 
 class Company(
     UUIDPrimaryKeyMixin,
@@ -175,7 +175,16 @@ class Company(
         passive_deletes=True,
         lazy="raise",
     )
-
+    
+    
+    activities: Mapped[list["Activity"]] = relationship(
+        "Activity",
+        back_populates="company",
+        passive_deletes=True,
+        lazy="raise",
+    )
+    
+    
 
 __all__ = [
     "Company",

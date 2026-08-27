@@ -164,6 +164,10 @@ async def test_update_current_organization() -> None:
 
 @pytest.mark.asyncio
 async def test_update_current_organization_updates_multiple_fields() -> None:
+    updated_email = unique_email(
+        "updated-organization",
+    )
+
     async with AsyncClient(
         transport=ASGITransport(app=app),
         base_url="http://testserver",
@@ -180,8 +184,10 @@ async def test_update_current_organization_updates_multiple_fields() -> None:
             },
             json={
                 "name": "Updated Organization",
-                "legal_name": "Updated Organization Private Limited",
-                "email": "updated@example.com",
+                "legal_name": (
+                    "Updated Organization Private Limited"
+                ),
+                "email": updated_email,
                 "phone": "+919999999999",
                 "timezone": "Asia/Kolkata",
                 "currency": "INR",
@@ -197,7 +203,7 @@ async def test_update_current_organization_updates_multiple_fields() -> None:
         data["legal_name"]
         == "Updated Organization Private Limited"
     )
-    assert data["email"] == "updated@example.com"
+    assert data["email"] == updated_email
     assert data["phone"] == "+919999999999"
     assert data["timezone"] == "Asia/Kolkata"
     assert data["currency"] == "INR"
@@ -225,7 +231,9 @@ async def test_update_current_organization_rejects_invalid_payload() -> None:
         transport=ASGITransport(app=app),
         base_url="http://testserver",
     ) as client:
-        _, access_token = await register_and_login(client)
+        _, access_token = await register_and_login(
+            client,
+        )
 
         response = await client.patch(
             "/api/v1/organizations/me",
@@ -246,7 +254,9 @@ async def test_update_current_organization_rejects_unknown_fields() -> None:
         transport=ASGITransport(app=app),
         base_url="http://testserver",
     ) as client:
-        _, access_token = await register_and_login(client)
+        _, access_token = await register_and_login(
+            client,
+        )
 
         response = await client.patch(
             "/api/v1/organizations/me",

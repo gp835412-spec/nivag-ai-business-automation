@@ -1,5 +1,6 @@
 """
 NIVAG AI Business Automation
+
 Organization Model
 
 Tenant root entity for the multi-tenant business platform.
@@ -20,6 +21,7 @@ from app.db.base.model_mixins import (
 )
 
 if TYPE_CHECKING:
+    from app.models.activity import Activity
     from app.models.company import Company
     from app.models.contact import Contact
     from app.models.lead import Lead
@@ -142,6 +144,14 @@ class Organization(
 
     opportunities: Mapped[list["Opportunity"]] = relationship(
         "Opportunity",
+        back_populates="organization",
+        cascade="all, delete-orphan",
+        passive_deletes=True,
+        lazy="raise",
+    )
+
+    activities: Mapped[list["Activity"]] = relationship(
+        "Activity",
         back_populates="organization",
         cascade="all, delete-orphan",
         passive_deletes=True,

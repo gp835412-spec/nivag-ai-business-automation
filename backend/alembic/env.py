@@ -16,17 +16,22 @@ from sqlalchemy.ext.asyncio import async_engine_from_config
 
 from app.core.config import settings
 from app.db.base.base import Base
+from app.models.activity import Activity  # noqa: F401
 from app.models.company import Company  # noqa: F401
 from app.models.contact import Contact  # noqa: F401
 from app.models.lead import Lead  # noqa: F401
+from app.models.opportunity import Opportunity  # noqa: F401
 from app.models.organization import Organization  # noqa: F401
 from app.models.user import User  # noqa: F401
+
 
 config = context.config
 
 
 if config.config_file_name is not None:
-    fileConfig(config.config_file_name)
+    fileConfig(
+        config.config_file_name,
+    )
 
 
 target_metadata = Base.metadata
@@ -75,11 +80,16 @@ def do_run_migrations(
 async def run_async_migrations() -> None:
     """Run Alembic migrations through SQLAlchemy's async engine."""
 
-    configuration = config.get_section(
-        config.config_ini_section,
-    ) or {}
+    configuration = (
+        config.get_section(
+            config.config_ini_section,
+        )
+        or {}
+    )
 
-    configuration["sqlalchemy.url"] = get_database_url()
+    configuration["sqlalchemy.url"] = (
+        get_database_url()
+    )
 
     connectable = async_engine_from_config(
         configuration,

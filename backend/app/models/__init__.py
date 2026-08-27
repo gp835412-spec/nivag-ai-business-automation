@@ -3,6 +3,11 @@ NIVAG AI Business Automation
 Database Model Registry
 """
 
+from app.models.activity import (
+    Activity,
+    ActivityStatus,
+    ActivityType,
+)
 from app.models.company import Company
 from app.models.contact import Contact
 from app.models.lead import Lead, LeadStatus
@@ -12,6 +17,9 @@ from app.models.user import User, UserRole, UserStatus
 
 
 __all__ = [
+    "Activity",
+    "ActivityStatus",
+    "ActivityType",
     "Company",
     "Contact",
     "Lead",

@@ -103,21 +103,17 @@ class OrganizationService:
             )
 
         else:
-            normalized_name = (
-                self._normalize_required_text(
-                    name,
-                    "name",
-                )
+            normalized_name = self._normalize_required_text(
+                name,
+                "name",
             )
 
             normalized_slug = self._normalize_slug(
                 slug,
             )
 
-            normalized_currency = (
-                self._normalize_currency(
-                    currency,
-                )
+            normalized_currency = self._normalize_currency(
+                currency,
             )
 
             normalized_email = self._normalize_email(
@@ -162,14 +158,15 @@ class OrganizationService:
                 "An organization with this slug already exists."
             )
 
-        existing_email = await self._repository.get_by_email(
-            organization.email,
-        )
-
-        if existing_email is not None:
-            raise ValueError(
-                "An organization with this email already exists."
+        if organization.email is not None:
+            existing_email = await self._repository.get_by_email(
+                organization.email,
             )
+
+            if existing_email is not None:
+                raise ValueError(
+                    "An organization with this email already exists."
+                )
 
         try:
             return await self._repository.add(
@@ -258,8 +255,8 @@ class OrganizationService:
         """
         Normalize, validate, and update an organization.
 
-        Slug and email uniqueness are enforced before
-        persistence.
+        The current organization may retain its existing slug
+        and email without being treated as a duplicate.
         """
 
         self._normalize_organization(
@@ -278,17 +275,18 @@ class OrganizationService:
                 "An organization with this slug already exists."
             )
 
-        existing_email = await self._repository.get_by_email(
-            organization.email,
-        )
-
-        if (
-            existing_email is not None
-            and existing_email.id != organization.id
-        ):
-            raise ValueError(
-                "An organization with this email already exists."
+        if organization.email is not None:
+            existing_email = await self._repository.get_by_email(
+                organization.email,
             )
+
+            if (
+                existing_email is not None
+                and existing_email.id != organization.id
+            ):
+                raise ValueError(
+                    "An organization with this email already exists."
+                )
 
         try:
             return await self._repository.update(
@@ -298,7 +296,7 @@ class OrganizationService:
         except IntegrityError as exc:
             raise ValueError(
                 "Organization could not be updated because one or "
-                "more unique values already exists."
+                "more unique values already exist."
             ) from exc
 
     async def delete(
@@ -323,11 +321,9 @@ class OrganizationService:
         Normalize all mutable organization fields.
         """
 
-        organization.name = (
-            self._normalize_required_text(
-                organization.name,
-                "name",
-            )
+        organization.name = self._normalize_required_text(
+            organization.name,
+            "name",
         )
 
         organization.slug = self._normalize_slug(
@@ -340,13 +336,24 @@ class OrganizationService:
             )
         )
 
-        organization.email = self._normalize_email(
+        organization.email = self._normalize_optional_text(
             organization.email,
         )
+
+        if organization.email is not None:
+            organization.email = self._normalize_email(
+                organization.email,
+            )
 
         organization.phone = (
             self._normalize_optional_text(
                 organization.phone,
+            )
+        )
+
+        organization.website = (
+            self._normalize_optional_text(
+                organization.website,
             )
         )
 
@@ -357,9 +364,13 @@ class OrganizationService:
             )
         )
 
-        organization.currency = (
-            self._normalize_currency(
-                organization.currency,
+        organization.currency = self._normalize_currency(
+            organization.currency,
+        )
+
+        organization.description = (
+            self._normalize_optional_text(
+                organization.description,
             )
         )
 
