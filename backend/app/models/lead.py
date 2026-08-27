@@ -2,12 +2,9 @@
 ==========================================================
 NIVAG AI Business Automation
 
-Contact Model
+Lead Model
 
-Tenant-scoped CRM contact entity.
-
-A contact always belongs to an organization and may
-optionally be associated with a company.
+Tenant-scoped CRM lead entity.
 
 Author:
 NIVAG
@@ -19,12 +16,14 @@ Proprietary
 
 from __future__ import annotations
 
+from enum import StrEnum
 from typing import TYPE_CHECKING
 from uuid import UUID
 
 from sqlalchemy import (
     ForeignKey,
     Index,
+    Numeric,
     String,
     Text,
 )
@@ -42,42 +41,54 @@ from app.db.base.model_mixins import (
 
 if TYPE_CHECKING:
     from app.models.company import Company
-    from app.models.lead import Lead
+    from app.models.contact import Contact
     from app.models.organization import Organization
 
 
-class Contact(
+class LeadStatus(StrEnum):
+    """Lifecycle status of a CRM lead."""
+
+    NEW = "new"
+    CONTACTED = "contacted"
+    QUALIFIED = "qualified"
+    PROPOSAL = "proposal"
+    NEGOTIATION = "negotiation"
+    WON = "won"
+    LOST = "lost"
+
+
+class Lead(
     UUIDPrimaryKeyMixin,
     TimestampMixin,
     Base,
 ):
     """
-    Represents a CRM contact inside an organization.
-
-    Every contact belongs to exactly one organization.
-
-    A contact may optionally be associated with a company
-    belonging to the same organization.
+    Represents a potential business opportunity inside
+    an organization.
     """
 
-    __tablename__ = "contacts"
+    __tablename__ = "leads"
 
     __table_args__ = (
         Index(
-            "ix_contacts_organization_email",
+            "ix_leads_organization_status",
             "organization_id",
-            "email",
+            "status",
         ),
         Index(
-            "ix_contacts_organization_name",
-            "organization_id",
-            "last_name",
-            "first_name",
-        ),
-        Index(
-            "ix_contacts_organization_company_id",
+            "ix_leads_organization_company_id",
             "organization_id",
             "company_id",
+        ),
+        Index(
+            "ix_leads_organization_contact_id",
+            "organization_id",
+            "contact_id",
+        ),
+        Index(
+            "ix_leads_organization_title",
+            "organization_id",
+            "title",
         ),
     )
 
@@ -99,9 +110,23 @@ class Contact(
         index=True,
     )
 
-    first_name: Mapped[str] = mapped_column(
-        String(100),
+    contact_id: Mapped[UUID | None] = mapped_column(
+        ForeignKey(
+            "contacts.id",
+            ondelete="SET NULL",
+        ),
+        nullable=True,
+        index=True,
+    )
+
+    title: Mapped[str] = mapped_column(
+        String(200),
         nullable=False,
+    )
+
+    first_name: Mapped[str | None] = mapped_column(
+        String(100),
+        nullable=True,
     )
 
     last_name: Mapped[str | None] = mapped_column(
@@ -124,9 +149,37 @@ class Contact(
         nullable=True,
     )
 
-    department: Mapped[str | None] = mapped_column(
-        String(150),
+    company_name: Mapped[str | None] = mapped_column(
+        String(200),
         nullable=True,
+    )
+
+    source: Mapped[str | None] = mapped_column(
+        String(100),
+        nullable=True,
+    )
+
+    status: Mapped[LeadStatus] = mapped_column(
+        String(32),
+        nullable=False,
+        default=LeadStatus.NEW,
+        server_default=LeadStatus.NEW.value,
+        index=True,
+    )
+
+    estimated_value: Mapped[float | None] = mapped_column(
+        Numeric(
+            precision=18,
+            scale=2,
+        ),
+        nullable=True,
+    )
+
+    currency: Mapped[str] = mapped_column(
+        String(3),
+        nullable=False,
+        default="INR",
+        server_default="INR",
     )
 
     description: Mapped[str | None] = mapped_column(
@@ -134,56 +187,26 @@ class Contact(
         nullable=True,
     )
 
-    address_line_1: Mapped[str | None] = mapped_column(
-        String(200),
-        nullable=True,
-    )
-
-    address_line_2: Mapped[str | None] = mapped_column(
-        String(200),
-        nullable=True,
-    )
-
-    city: Mapped[str | None] = mapped_column(
-        String(100),
-        nullable=True,
-    )
-
-    state: Mapped[str | None] = mapped_column(
-        String(100),
-        nullable=True,
-    )
-
-    postal_code: Mapped[str | None] = mapped_column(
-        String(32),
-        nullable=True,
-    )
-
-    country: Mapped[str | None] = mapped_column(
-        String(100),
-        nullable=True,
-    )
-
     organization: Mapped["Organization"] = relationship(
         "Organization",
-        back_populates="contacts",
+        back_populates="leads",
         lazy="raise",
     )
 
     company: Mapped["Company | None"] = relationship(
         "Company",
-        back_populates="contacts",
+        back_populates="leads",
         lazy="raise",
     )
 
-    leads: Mapped[list["Lead"]] = relationship(
-        "Lead",
-        back_populates="contact",
-        passive_deletes=True,
+    contact: Mapped["Contact | None"] = relationship(
+        "Contact",
+        back_populates="leads",
         lazy="raise",
     )
 
 
 __all__ = [
-    "Contact",
+    "Lead",
+    "LeadStatus",
 ]

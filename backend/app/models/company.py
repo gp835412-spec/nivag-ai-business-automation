@@ -39,6 +39,7 @@ from app.db.base.model_mixins import (
 
 if TYPE_CHECKING:
     from app.models.contact import Contact
+    from app.models.lead import Lead
     from app.models.organization import Organization
 
 
@@ -155,6 +156,13 @@ class Company(
 
     contacts: Mapped[list["Contact"]] = relationship(
         "Contact",
+        back_populates="company",
+        passive_deletes=True,
+        lazy="raise",
+    )
+
+    leads: Mapped[list["Lead"]] = relationship(
+        "Lead",
         back_populates="company",
         passive_deletes=True,
         lazy="raise",
