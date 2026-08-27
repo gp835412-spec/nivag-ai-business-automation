@@ -25,6 +25,7 @@ from app.api.v1.auth import router as auth_router
 from app.api.v1.companies import router as companies_router
 from app.api.v1.contacts import router as contacts_router
 from app.api.v1.leads import router as leads_router
+from app.api.v1.opportunities import router as opportunities_router
 from app.api.v1.organizations import router as organizations_router
 from app.api.v1.users import router as users_router
 from app.core.config import settings
@@ -79,6 +80,11 @@ def create_application() -> FastAPI:
 
     application.include_router(
         leads_router,
+        prefix="/api/v1",
+    )
+
+    application.include_router(
+        opportunities_router,
         prefix="/api/v1",
     )
 

@@ -23,6 +23,7 @@ if TYPE_CHECKING:
     from app.models.company import Company
     from app.models.contact import Contact
     from app.models.lead import Lead
+    from app.models.opportunity import Opportunity
     from app.models.user import User
 
 
@@ -133,6 +134,14 @@ class Organization(
 
     leads: Mapped[list["Lead"]] = relationship(
         "Lead",
+        back_populates="organization",
+        cascade="all, delete-orphan",
+        passive_deletes=True,
+        lazy="raise",
+    )
+
+    opportunities: Mapped[list["Opportunity"]] = relationship(
+        "Opportunity",
         back_populates="organization",
         cascade="all, delete-orphan",
         passive_deletes=True,

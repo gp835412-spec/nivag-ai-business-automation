@@ -144,7 +144,7 @@ class User(
         server_default="false",
     )
 
-    organization: Mapped[Organization] = relationship(
+    organization: Mapped["Organization"] = relationship(
         "Organization",
         back_populates="users",
         lazy="raise",
@@ -161,9 +161,10 @@ class User(
             f"status={self.status.value!r}"
             f")>"
         )
-    
-    __all__ = [
-       "User",
-       "UserRole",
-       "UserStatus",
-    ]
+
+
+__all__ = [
+    "User",
+    "UserRole",
+    "UserStatus",
+]

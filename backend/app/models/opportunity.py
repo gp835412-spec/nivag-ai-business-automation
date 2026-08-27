@@ -2,9 +2,12 @@
 ==========================================================
 NIVAG AI Business Automation
 
-Lead Model
+Opportunity Model
 
-Tenant-scoped CRM lead entity.
+Tenant-scoped CRM opportunity entity.
+
+An opportunity belongs to an organization and may optionally
+be associated with an existing lead, company, or contact.
 
 Author:
 NIVAG
@@ -16,6 +19,7 @@ Proprietary
 
 from __future__ import annotations
 
+from decimal import Decimal
 from enum import StrEnum
 from typing import TYPE_CHECKING
 from uuid import UUID
@@ -42,54 +46,63 @@ from app.db.base.model_mixins import (
 if TYPE_CHECKING:
     from app.models.company import Company
     from app.models.contact import Contact
-    from app.models.opportunity import Opportunity
+    from app.models.lead import Lead
     from app.models.organization import Organization
 
 
-class LeadStatus(StrEnum):
-    """Lifecycle status of a CRM lead."""
+class OpportunityStage(StrEnum):
+    """Lifecycle stage of a CRM opportunity."""
 
-    NEW = "new"
-    CONTACTED = "contacted"
-    QUALIFIED = "qualified"
+    PROSPECTING = "prospecting"
+    QUALIFICATION = "qualification"
     PROPOSAL = "proposal"
     NEGOTIATION = "negotiation"
     WON = "won"
     LOST = "lost"
 
 
-class Lead(
+class Opportunity(
     UUIDPrimaryKeyMixin,
     TimestampMixin,
     Base,
 ):
     """
-    Represents a potential business opportunity inside
+    Represents a potential revenue opportunity inside
     an organization.
+
+    Every opportunity belongs to exactly one organization.
+
+    It may optionally be associated with a lead, company,
+    and/or contact belonging to the same organization.
     """
 
-    __tablename__ = "leads"
+    __tablename__ = "opportunities"
 
     __table_args__ = (
         Index(
-            "ix_leads_organization_status",
+            "ix_opportunities_organization_stage",
             "organization_id",
-            "status",
+            "stage",
         ),
         Index(
-            "ix_leads_organization_company_id",
+            "ix_opportunities_organization_company_id",
             "organization_id",
             "company_id",
         ),
         Index(
-            "ix_leads_organization_contact_id",
+            "ix_opportunities_organization_contact_id",
             "organization_id",
             "contact_id",
         ),
         Index(
-            "ix_leads_organization_title",
+            "ix_opportunities_organization_lead_id",
             "organization_id",
-            "title",
+            "lead_id",
+        ),
+        Index(
+            "ix_opportunities_organization_name",
+            "organization_id",
+            "name",
         ),
     )
 
@@ -99,6 +112,15 @@ class Lead(
             ondelete="CASCADE",
         ),
         nullable=False,
+        index=True,
+    )
+
+    lead_id: Mapped[UUID | None] = mapped_column(
+        ForeignKey(
+            "leads.id",
+            ondelete="SET NULL",
+        ),
+        nullable=True,
         index=True,
     )
 
@@ -120,55 +142,20 @@ class Lead(
         index=True,
     )
 
-    title: Mapped[str] = mapped_column(
+    name: Mapped[str] = mapped_column(
         String(200),
         nullable=False,
     )
 
-    first_name: Mapped[str | None] = mapped_column(
-        String(100),
-        nullable=True,
-    )
-
-    last_name: Mapped[str | None] = mapped_column(
-        String(100),
-        nullable=True,
-    )
-
-    email: Mapped[str | None] = mapped_column(
-        String(320),
-        nullable=True,
-    )
-
-    phone: Mapped[str | None] = mapped_column(
-        String(32),
-        nullable=True,
-    )
-
-    job_title: Mapped[str | None] = mapped_column(
-        String(150),
-        nullable=True,
-    )
-
-    company_name: Mapped[str | None] = mapped_column(
-        String(200),
-        nullable=True,
-    )
-
-    source: Mapped[str | None] = mapped_column(
-        String(100),
-        nullable=True,
-    )
-
-    status: Mapped[LeadStatus] = mapped_column(
+    stage: Mapped[OpportunityStage] = mapped_column(
         String(32),
         nullable=False,
-        default=LeadStatus.NEW,
-        server_default=LeadStatus.NEW.value,
+        default=OpportunityStage.PROSPECTING,
+        server_default=OpportunityStage.PROSPECTING.value,
         index=True,
     )
 
-    estimated_value: Mapped[float | None] = mapped_column(
+    amount: Mapped[Decimal | None] = mapped_column(
         Numeric(
             precision=18,
             scale=2,
@@ -190,31 +177,30 @@ class Lead(
 
     organization: Mapped["Organization"] = relationship(
         "Organization",
-        back_populates="leads",
+        back_populates="opportunities",
+        lazy="raise",
+    )
+
+    lead: Mapped["Lead | None"] = relationship(
+        "Lead",
+        back_populates="opportunities",
         lazy="raise",
     )
 
     company: Mapped["Company | None"] = relationship(
         "Company",
-        back_populates="leads",
+        back_populates="opportunities",
         lazy="raise",
     )
 
     contact: Mapped["Contact | None"] = relationship(
         "Contact",
-        back_populates="leads",
-        lazy="raise",
-    )
-
-    opportunities: Mapped[list["Opportunity"]] = relationship(
-        "Opportunity",
-        back_populates="lead",
-        passive_deletes=True,
+        back_populates="opportunities",
         lazy="raise",
     )
 
 
 __all__ = [
-    "Lead",
-    "LeadStatus",
+    "Opportunity",
+    "OpportunityStage",
 ]
