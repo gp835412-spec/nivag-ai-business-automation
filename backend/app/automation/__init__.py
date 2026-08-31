@@ -27,6 +27,7 @@ from app.automation.handlers import (
     AutomationHandlerRegistry,
 )
 
+from app.automation.executor import AutomationExecutor
 
 __all__ = [
     "AutomationDispatcher",
@@ -35,4 +36,5 @@ __all__ = [
     "AutomationEventType",
     "AutomationHandler",
     "AutomationHandlerRegistry",
+    "AutomationExecutor",
 ]

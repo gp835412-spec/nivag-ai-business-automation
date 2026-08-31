@@ -37,9 +37,17 @@ from app.repositories.activity_repository import (
 def session() -> AsyncMock:
     """
     Return a mocked asynchronous database session.
+
+    AsyncSession.add() is synchronous.
+    AsyncSession.delete(), execute(), flush(), and refresh()
+    are asynchronous methods for this test contract.
     """
 
-    return AsyncMock()
+    session = AsyncMock()
+
+    session.add = MagicMock()
+
+    return session
 
 
 @pytest.fixture
@@ -198,9 +206,7 @@ async def test_list_returns_activities(
     organization_id = uuid4()
 
     result_mock = MagicMock()
-    result_mock.scalars.return_value.all.return_value = (
-        activities
-    )
+    result_mock.scalars.return_value.all.return_value = activities
 
     session.execute.return_value = result_mock
 
