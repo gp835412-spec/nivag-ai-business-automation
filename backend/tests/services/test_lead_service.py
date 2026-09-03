@@ -23,6 +23,7 @@ from uuid import uuid4
 
 import pytest
 
+from app.automation import AutomationEventType
 from app.models.company import Company
 from app.models.contact import Contact
 from app.models.lead import Lead
@@ -70,10 +71,18 @@ def contact_repository() -> AsyncMock:
 
 
 @pytest.fixture
+def automation_dispatcher() -> AsyncMock:
+    """Return a mocked automation dispatcher."""
+
+    return AsyncMock()
+
+
+@pytest.fixture
 def service(
     lead_repository: AsyncMock,
     company_repository: AsyncMock,
     contact_repository: AsyncMock,
+    automation_dispatcher: AsyncMock,
 ) -> LeadService:
     """Return a configured lead service."""
 
@@ -81,6 +90,7 @@ def service(
         lead_repository=lead_repository,
         company_repository=company_repository,
         contact_repository=contact_repository,
+        automation_dispatcher=automation_dispatcher,
     )
 
 
@@ -178,6 +188,245 @@ async def test_create_lead(
 
     lead_repository.create.assert_awaited_once()
 
+
+@pytest.mark.asyncio
+async def test_create_lead_dispatches_created_event(
+    service: LeadService,
+    lead_repository: AsyncMock,
+    automation_dispatcher: AsyncMock,
+) -> None:
+    """Creating a lead dispatches a lead.created event."""
+
+    organization_id = uuid4()
+
+    payload = LeadCreate(
+        title="Automation Test Lead",
+        first_name="John",
+        last_name="Doe",
+        email="john@example.com",
+        status=LeadStatus.NEW,
+    )
+
+    created_lead = build_lead(
+        organization_id=organization_id,
+        title=payload.title,
+        first_name=payload.first_name,
+        last_name=payload.last_name,
+        email=str(payload.email),
+        status=payload.status.value,
+    )
+
+    lead_repository.create.return_value = created_lead
+
+    result = await service.create_lead(
+        organization_id=organization_id,
+        payload=payload,
+    )
+
+    assert result.id == created_lead.id
+
+    automation_dispatcher.dispatch.assert_awaited_once()
+
+    event = automation_dispatcher.dispatch.await_args.args[0]
+
+    assert event.event_type == AutomationEventType.LEAD_CREATED
+    assert event.organization_id == organization_id
+    assert event.entity_id == created_lead.id
+    assert event.payload["lead_id"] == str(
+        created_lead.id,
+    )
+    assert event.payload["organization_id"] == str(
+        organization_id,
+    )
+    assert event.payload["title"] == created_lead.title
+    assert event.payload["status"] == created_lead.status
+
+
+@pytest.mark.asyncio
+async def test_update_lead_dispatches_updated_event(
+    service: LeadService,
+    lead_repository: AsyncMock,
+    automation_dispatcher: AsyncMock,
+) -> None:
+    """Updating a lead dispatches a lead.updated event."""
+
+    organization_id = uuid4()
+    lead_id = uuid4()
+
+    lead = build_lead(
+        lead_id=lead_id,
+        organization_id=organization_id,
+        title="Original Lead",
+        status=LeadStatus.NEW.value,
+    )
+
+    lead_repository.get_by_id.return_value = lead
+    lead_repository.update.return_value = lead
+
+    payload = LeadUpdate(
+        title="Updated Lead",
+    )
+
+    result = await service.update_lead(
+        organization_id=organization_id,
+        lead_id=lead_id,
+        payload=payload,
+    )
+
+    assert result.id == lead_id
+
+    automation_dispatcher.dispatch.assert_awaited_once()
+
+    event = automation_dispatcher.dispatch.await_args.args[0]
+
+    assert event.event_type == AutomationEventType.LEAD_UPDATED
+    assert event.organization_id == organization_id
+    assert event.entity_id == lead_id
+    assert event.payload["lead_id"] == str(lead_id)
+    assert event.payload["organization_id"] == str(organization_id)
+    assert event.payload["title"] == lead.title
+    assert event.payload["status"] == lead.status
+
+
+@pytest.mark.asyncio
+async def test_update_lead_dispatches_status_changed_event(
+    service: LeadService,
+    lead_repository: AsyncMock,
+    automation_dispatcher: AsyncMock,
+) -> None:
+    """Changing a lead status dispatches a lead.status_changed event."""
+
+    organization_id = uuid4()
+    lead_id = uuid4()
+
+    lead = build_lead(
+        lead_id=lead_id,
+        organization_id=organization_id,
+        title="Status Change Lead",
+        status=LeadStatus.NEW.value,
+    )
+
+    lead_repository.get_by_id.return_value = lead
+    lead_repository.update.return_value = lead
+
+    payload = LeadUpdate(
+        status=LeadStatus.QUALIFIED,
+    )
+
+    result = await service.update_lead(
+        organization_id=organization_id,
+        lead_id=lead_id,
+        payload=payload,
+    )
+
+    assert result.id == lead_id
+
+    assert automation_dispatcher.dispatch.await_count == 2
+
+    events = [
+        call.args[0]
+        for call in automation_dispatcher.dispatch.await_args_list
+    ]
+
+    updated_event = events[0]
+    status_changed_event = events[1]
+
+    assert updated_event.event_type == AutomationEventType.LEAD_UPDATED
+
+    assert status_changed_event.event_type == (
+        AutomationEventType.LEAD_STATUS_CHANGED
+    )
+    assert status_changed_event.organization_id == organization_id
+    assert status_changed_event.entity_id == lead_id
+    assert status_changed_event.payload["lead_id"] == str(lead_id)
+    assert status_changed_event.payload["organization_id"] == str(
+        organization_id
+    )
+    assert status_changed_event.payload["previous_status"] == LeadStatus.NEW.value
+    assert status_changed_event.payload["new_status"] == LeadStatus.QUALIFIED.value
+
+
+@pytest.mark.asyncio
+async def test_update_lead_does_not_dispatch_status_changed_when_status_unchanged(
+    service: LeadService,
+    lead_repository: AsyncMock,
+    automation_dispatcher: AsyncMock,
+) -> None:
+    """Updating other fields without changing status emits no status event."""
+
+    organization_id = uuid4()
+    lead_id = uuid4()
+
+    lead = build_lead(
+        lead_id=lead_id,
+        organization_id=organization_id,
+        title="Unchanged Status Lead",
+        status=LeadStatus.NEW.value,
+    )
+
+    lead_repository.get_by_id.return_value = lead
+    lead_repository.update.return_value = lead
+
+    payload = LeadUpdate(
+        title="Updated Without Status Change",
+    )
+
+    result = await service.update_lead(
+        organization_id=organization_id,
+        lead_id=lead_id,
+        payload=payload,
+    )
+
+    assert result.id == lead_id
+
+    automation_dispatcher.dispatch.assert_awaited_once()
+
+    event = automation_dispatcher.dispatch.await_args.args[0]
+
+    assert event.event_type == AutomationEventType.LEAD_UPDATED
+
+    assert not any(
+        call.args[0].event_type == AutomationEventType.LEAD_STATUS_CHANGED
+        for call in automation_dispatcher.dispatch.await_args_list
+    )
+
+
+@pytest.mark.asyncio
+async def test_update_lead_validation_failure_dispatches_no_event(
+    service: LeadService,
+    lead_repository: AsyncMock,
+    company_repository: AsyncMock,
+    automation_dispatcher: AsyncMock,
+) -> None:
+    """Validation failure prevents automation event dispatch."""
+
+    organization_id = uuid4()
+    lead_id = uuid4()
+    invalid_company_id = uuid4()
+
+    lead = build_lead(
+        lead_id=lead_id,
+        organization_id=organization_id,
+        title="Validation Failure Lead",
+        status=LeadStatus.NEW.value,
+    )
+
+    lead_repository.get_by_id.return_value = lead
+    company_repository.get_by_id.return_value = None
+
+    payload = LeadUpdate(
+        company_id=invalid_company_id,
+    )
+
+    with pytest.raises(Exception):
+        await service.update_lead(
+            organization_id=organization_id,
+            lead_id=lead_id,
+            payload=payload,
+        )
+
+    automation_dispatcher.dispatch.assert_not_awaited()
+    lead_repository.update.assert_not_awaited()
 
 @pytest.mark.asyncio
 async def test_create_lead_with_company(

@@ -45,6 +45,7 @@ class AutomationEventType(StrEnum):
 
     LEAD_CREATED = "lead.created"
     LEAD_UPDATED = "lead.updated"
+    LEAD_STATUS_CHANGED = "lead.status_changed"
 
     OPPORTUNITY_CREATED = "opportunity.created"
     OPPORTUNITY_UPDATED = "opportunity.updated"

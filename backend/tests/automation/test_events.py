@@ -21,6 +21,7 @@ def test_automation_event_type_values() -> None:
     assert AutomationEventType.CONTACT_UPDATED.value == "contact.updated"
     assert AutomationEventType.LEAD_CREATED.value == "lead.created"
     assert AutomationEventType.LEAD_UPDATED.value == "lead.updated"
+    assert AutomationEventType.LEAD_STATUS_CHANGED.value == "lead.status_changed"
     assert AutomationEventType.OPPORTUNITY_CREATED.value == "opportunity.created"
     assert AutomationEventType.OPPORTUNITY_UPDATED.value == "opportunity.updated"
 

@@ -29,6 +29,13 @@ from fastapi import (
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.v1.dependencies.auth import get_current_user
+from app.automation import (
+    AutomationDispatcher,
+    AutomationEventType,
+)
+from app.automation.lead_handlers import (
+    LeadCreatedActivityHandler,
+)
 from app.db.session.database import get_db_session
 from app.models.user import User
 from app.repositories.company_repository import CompanyRepository
@@ -47,6 +54,7 @@ from app.services.lead_service import (
     LeadService,
 )
 
+
 router = APIRouter(
     prefix="/leads",
     tags=["Leads"],
@@ -60,8 +68,22 @@ def get_lead_service(
 ) -> LeadService:
     """
     Provide the lead service with all required repository
-    dependencies.
+    and automation dependencies.
+
+    The dispatcher is request-scoped because the registered
+    handler may depend on the current request's database
+    resources in future handlers.
+
+    The LeadCreatedActivityHandler itself is stateless and
+    acquires its own fresh database session when executed.
     """
+
+    automation_dispatcher = AutomationDispatcher()
+
+    automation_dispatcher.register(
+        event_type=AutomationEventType.LEAD_CREATED,
+        handler=LeadCreatedActivityHandler(),
+    )
 
     return LeadService(
         lead_repository=LeadRepository(
@@ -73,6 +95,7 @@ def get_lead_service(
         contact_repository=ContactRepository(
             session,
         ),
+        automation_dispatcher=automation_dispatcher,
     )
 
 
@@ -91,7 +114,11 @@ async def create_lead(
     ),
 ) -> LeadResponse:
     """
-    Create a lead inside the authenticated user's organization.
+    Create a lead inside the authenticated user's
+    organization.
+
+    Successful creation emits LEAD_CREATED, which is handled
+    by the lead activity automation handler.
     """
 
     try:
@@ -131,7 +158,8 @@ async def list_leads(
     ),
 ) -> LeadListResponse:
     """
-    List leads belonging to the authenticated user's organization.
+    List leads belonging to the authenticated user's
+    organization.
     """
 
     return await service.list_leads(
@@ -155,7 +183,7 @@ async def get_lead(
     ),
 ) -> LeadResponse:
     """
-    Get a lead belonging to the authenticated user's organization.
+    Retrieve a tenant-scoped lead by ID.
     """
 
     try:
@@ -185,7 +213,7 @@ async def update_lead(
     ),
 ) -> LeadResponse:
     """
-    Update a lead belonging to the authenticated user's organization.
+    Update a tenant-scoped lead.
     """
 
     try:
@@ -219,7 +247,7 @@ async def delete_lead(
     ),
 ) -> Response:
     """
-    Delete a lead belonging to the authenticated user's organization.
+    Delete a tenant-scoped lead.
     """
 
     try:

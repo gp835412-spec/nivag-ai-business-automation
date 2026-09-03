@@ -146,8 +146,10 @@ class AutomationDispatcher:
             event_type,
         )
 
+automation_dispatcher = AutomationDispatcher()
 
 __all__ = [
     "AutomationEventHandler",
     "AutomationDispatcher",
+    "automation_dispatcher",
 ]

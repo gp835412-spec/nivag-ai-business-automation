@@ -17,6 +17,7 @@ Proprietary
 from app.automation.dispatcher import (
     AutomationDispatcher,
     AutomationEventHandler,
+    automation_dispatcher,
 )
 from app.automation.events import (
     AutomationEvent,
@@ -37,4 +38,5 @@ __all__ = [
     "AutomationHandler",
     "AutomationHandlerRegistry",
     "AutomationExecutor",
+    "automation_dispatcher",
 ]

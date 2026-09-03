@@ -16,8 +16,14 @@ Proprietary
 
 from __future__ import annotations
 
+from datetime import datetime, timezone
 from uuid import UUID
 
+from app.automation import (
+    AutomationDispatcher,
+    AutomationEvent,
+    AutomationEventType,
+)
 from app.models.company import Company
 from app.models.contact import Contact
 from app.models.lead import Lead
@@ -59,10 +65,12 @@ class LeadService:
         lead_repository: LeadRepository,
         company_repository: CompanyRepository,
         contact_repository: ContactRepository,
+        automation_dispatcher: AutomationDispatcher,
     ) -> None:
         self._lead_repository = lead_repository
         self._company_repository = company_repository
         self._contact_repository = contact_repository
+        self._automation_dispatcher = automation_dispatcher
 
     async def create_lead(
         self,
@@ -72,6 +80,9 @@ class LeadService:
     ) -> LeadResponse:
         """
         Create a new lead inside an organization.
+
+        A lead.created automation event is dispatched only
+        after the lead has been successfully persisted.
         """
 
         if payload.company_id is not None:
@@ -93,6 +104,25 @@ class LeadService:
 
         created = await self._lead_repository.create(
             lead,
+        )
+
+        await self._automation_dispatcher.dispatch(
+            AutomationEvent(
+                event_type=AutomationEventType.LEAD_CREATED,
+                organization_id=created.organization_id,
+                entity_id=created.id,
+                occurred_at=datetime.now(
+                    timezone.utc,
+                ),
+                payload={
+                    "lead_id": str(created.id),
+                    "organization_id": str(
+                        created.organization_id,
+                    ),
+                    "title": created.title,
+                    "status": created.status,
+                },
+            ),
         )
 
         return LeadResponse.model_validate(
@@ -175,6 +205,12 @@ class LeadService:
     ) -> LeadResponse:
         """
         Update a lead belonging to an organization.
+
+        A lead.updated event is dispatched after successful
+        persistence.
+
+        A lead.status_changed event is additionally dispatched
+        when the lead status actually changes.
         """
 
         lead = await self._lead_repository.get_by_id(
@@ -186,6 +222,8 @@ class LeadService:
             raise LeadNotFoundError(
                 "Lead not found.",
             )
+
+        previous_status = lead.status
 
         update_data = payload.model_dump(
             exclude_unset=True,
@@ -224,9 +262,54 @@ class LeadService:
                 value,
             )
 
+        status_changed = (
+            "status" in update_data
+            and previous_status != lead.status
+        )
+
         updated = await self._lead_repository.update(
             lead,
         )
+
+        await self._automation_dispatcher.dispatch(
+            AutomationEvent(
+                event_type=AutomationEventType.LEAD_UPDATED,
+                organization_id=updated.organization_id,
+                entity_id=updated.id,
+                occurred_at=datetime.now(
+                    timezone.utc,
+                ),
+                payload={
+                    "lead_id": str(updated.id),
+                    "organization_id": str(
+                        updated.organization_id,
+                    ),
+                    "title": updated.title,
+                    "status": updated.status,
+                },
+            ),
+        )
+
+        if status_changed:
+            await self._automation_dispatcher.dispatch(
+                AutomationEvent(
+                    event_type=AutomationEventType.LEAD_STATUS_CHANGED,
+                    organization_id=updated.organization_id,
+                    entity_id=updated.id,
+                    occurred_at=datetime.now(
+                        timezone.utc,
+                    ),
+                    payload={
+                        "lead_id": str(updated.id),
+                        "organization_id": str(
+                            updated.organization_id,
+                        ),
+                        "title": updated.title,
+                        "previous_status": previous_status,
+                        "new_status": updated.status,
+                    },
+                ),
+            )
 
         return LeadResponse.model_validate(
             updated,

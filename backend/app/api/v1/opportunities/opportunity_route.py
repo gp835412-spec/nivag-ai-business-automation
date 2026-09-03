@@ -25,7 +25,10 @@ from fastapi import (
     Query,
     status,
 )
+from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.db.session.database import get_db_session
+from app.repositories.opportunity_repository import OpportunityRepository
 from app.schemas.opportunity.create import OpportunityCreate
 from app.schemas.opportunity.update import OpportunityUpdate
 from app.services.opportunity_service import (
@@ -41,17 +44,16 @@ router = APIRouter(
 )
 
 
-def get_opportunity_service() -> OpportunityService:
+def get_opportunity_service(
+    session: AsyncSession = Depends(get_db_session),
+) -> OpportunityService:
     """
-    Return the configured OpportunityService.
-
-    The concrete dependency wiring should provide the
-    repository-backed service instance.
+    Provide the opportunity service for the current request.
     """
 
-    raise NotImplementedError(
-        "Opportunity service dependency has not been configured."
-    )
+    repository = OpportunityRepository(session)
+
+    return OpportunityService(repository)
 
 
 @router.post(

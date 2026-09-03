@@ -37,6 +37,17 @@ class OpportunityRepository:
     ) -> None:
         self._session = session
 
+    @property
+    def session(self) -> AsyncSession:
+        """
+        Return the current database session.
+
+        Provides controlled access to the repository session
+        for application-service validation logic.
+        """
+
+        return self._session
+
     async def create(
         self,
         opportunity: Opportunity,
@@ -66,13 +77,15 @@ class OpportunityRepository:
         opportunity_id: UUID,
     ) -> Opportunity | None:
         """
-        Return an opportunity by ID within the specified organization.
+        Return an opportunity by ID within the specified
+        organization.
         """
 
         statement: Select[tuple[Opportunity]] = (
             select(
                 Opportunity,
-            ).where(
+            )
+            .where(
                 Opportunity.id == opportunity_id,
                 Opportunity.organization_id == organization_id,
             )
