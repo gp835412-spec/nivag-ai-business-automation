@@ -6,6 +6,12 @@ Opportunity Service
 
 Business logic for tenant-scoped CRM opportunities.
 
+Responsibilities:
+- Create, read, update, and delete opportunities.
+- Enforce organization/tenant isolation.
+- Validate referenced CRM entities.
+- Emit opportunity lifecycle automation events.
+
 Author:
 NIVAG
 
@@ -16,9 +22,15 @@ Proprietary
 
 from __future__ import annotations
 
+from datetime import datetime, timezone
 from typing import Sequence
 from uuid import UUID
 
+from app.automation import (
+    AutomationDispatcher,
+    AutomationEvent,
+    AutomationEventType,
+)
 from app.models.company import Company
 from app.models.contact import Contact
 from app.models.lead import Lead
@@ -48,8 +60,10 @@ class OpportunityService:
     def __init__(
         self,
         repository: OpportunityRepository,
+        automation_dispatcher: AutomationDispatcher,
     ) -> None:
         self._repository = repository
+        self._automation_dispatcher = automation_dispatcher
 
     async def create_opportunity(
         self,
@@ -58,10 +72,12 @@ class OpportunityService:
         data: OpportunityCreate,
     ) -> Opportunity:
         """
-        Create a new opportunity inside an organization.
+        Create an opportunity inside an organization.
 
-        Any referenced lead, company, or contact must belong
-        to the same organization.
+        Referenced lead, company, and contact entities must
+        belong to the same organization.
+
+        Successful creation emits OPPORTUNITY_CREATED.
         """
 
         await self._validate_references(
@@ -83,9 +99,23 @@ class OpportunityService:
             description=data.description,
         )
 
-        return await self._repository.create(
+        created_opportunity = await self._repository.create(
             opportunity=opportunity,
         )
+
+        await self._automation_dispatcher.dispatch(
+            AutomationEvent(
+                event_type=AutomationEventType.OPPORTUNITY_CREATED,
+                organization_id=organization_id,
+                entity_id=created_opportunity.id,
+                occurred_at=datetime.now(timezone.utc),
+                payload=self._build_event_payload(
+                    created_opportunity,
+                ),
+            )
+        )
+
+        return created_opportunity
 
     async def get_opportunity(
         self,
@@ -93,9 +123,7 @@ class OpportunityService:
         organization_id: UUID,
         opportunity_id: UUID,
     ) -> Opportunity:
-        """
-        Return one opportunity belonging to an organization.
-        """
+        """Return one tenant-scoped opportunity."""
 
         opportunity = await self._repository.get_by_id(
             organization_id=organization_id,
@@ -116,9 +144,7 @@ class OpportunityService:
         offset: int = 0,
         limit: int = 100,
     ) -> Sequence[Opportunity]:
-        """
-        Return opportunities belonging to an organization.
-        """
+        """Return tenant-scoped opportunities."""
 
         return await self._repository.list(
             organization_id=organization_id,
@@ -134,9 +160,11 @@ class OpportunityService:
         data: OpportunityUpdate,
     ) -> Opportunity:
         """
-        Update an existing opportunity.
+        Update an opportunity.
 
-        Only explicitly supplied fields are updated.
+        Only explicitly supplied fields are modified.
+
+        Successful update emits OPPORTUNITY_UPDATED.
         """
 
         opportunity = await self.get_opportunity(
@@ -152,10 +180,12 @@ class OpportunityService:
             "lead_id",
             opportunity.lead_id,
         )
+
         company_id = update_data.get(
             "company_id",
             opportunity.company_id,
         )
+
         contact_id = update_data.get(
             "contact_id",
             opportunity.contact_id,
@@ -175,9 +205,29 @@ class OpportunityService:
                 value,
             )
 
-        return await self._repository.update(
+        updated_opportunity = await self._repository.update(
             opportunity=opportunity,
         )
+
+        payload = self._build_event_payload(
+            updated_opportunity,
+        )
+
+        payload["changed_fields"] = list(
+            update_data.keys()
+        )
+
+        await self._automation_dispatcher.dispatch(
+            AutomationEvent(
+                event_type=AutomationEventType.OPPORTUNITY_UPDATED,
+                organization_id=organization_id,
+                entity_id=updated_opportunity.id,
+                occurred_at=datetime.now(timezone.utc),
+                payload=payload,
+            )
+        )
+
+        return updated_opportunity
 
     async def delete_opportunity(
         self,
@@ -185,9 +235,7 @@ class OpportunityService:
         organization_id: UUID,
         opportunity_id: UUID,
     ) -> None:
-        """
-        Delete an opportunity belonging to an organization.
-        """
+        """Delete a tenant-scoped opportunity."""
 
         opportunity = await self.get_opportunity(
             organization_id=organization_id,
@@ -207,8 +255,8 @@ class OpportunityService:
         contact_id: UUID | None,
     ) -> None:
         """
-        Validate that all referenced CRM entities belong to
-        the same organization as the opportunity.
+        Validate that referenced CRM entities belong to the
+        same organization as the opportunity.
         """
 
         session = self._repository.session
@@ -254,6 +302,22 @@ class OpportunityService:
                 raise OpportunityValidationError(
                     "Invalid contact for this organization."
                 )
+
+    @staticmethod
+    def _build_event_payload(
+        opportunity: Opportunity,
+    ) -> dict[str, object]:
+        """Build the canonical opportunity automation payload."""
+
+        return {
+            "name": opportunity.name,
+            "stage": opportunity.stage,
+            "amount": opportunity.amount,
+            "currency": opportunity.currency,
+            "lead_id": opportunity.lead_id,
+            "company_id": opportunity.company_id,
+            "contact_id": opportunity.contact_id,
+        }
 
 
 __all__ = [

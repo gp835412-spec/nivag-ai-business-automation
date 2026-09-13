@@ -28,7 +28,12 @@ from app.automation.handlers import (
     AutomationHandlerRegistry,
 )
 
+
 from app.automation.executor import AutomationExecutor
+
+from app.automation.opportunity_handlers import (
+    OpportunityCreatedActivityHandler,
+)
 
 __all__ = [
     "AutomationDispatcher",
@@ -38,5 +43,9 @@ __all__ = [
     "AutomationHandler",
     "AutomationHandlerRegistry",
     "AutomationExecutor",
+    "OpportunityCreatedActivityHandler",
     "automation_dispatcher",
+
+
+
 ]

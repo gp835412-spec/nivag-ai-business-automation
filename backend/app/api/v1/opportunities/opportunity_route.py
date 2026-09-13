@@ -23,14 +23,22 @@ from fastapi import (
     Depends,
     HTTPException,
     Query,
+    Response,
     status,
 )
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.automation import (
+    AutomationDispatcher,
+    AutomationEventType,
+    OpportunityCreatedActivityHandler,
+)
 from app.db.session.database import get_db_session
+from app.repositories.activity_repository import ActivityRepository
 from app.repositories.opportunity_repository import OpportunityRepository
 from app.schemas.opportunity.create import OpportunityCreate
 from app.schemas.opportunity.update import OpportunityUpdate
+from app.services.activity_service import ActivityService
 from app.services.opportunity_service import (
     OpportunityNotFoundError,
     OpportunityService,
@@ -45,15 +53,35 @@ router = APIRouter(
 
 
 def get_opportunity_service(
-    session: AsyncSession = Depends(get_db_session),
+    session: AsyncSession = Depends(
+        get_db_session,
+    ),
 ) -> OpportunityService:
-    """
-    Provide the opportunity service for the current request.
-    """
+    """Provide the opportunity service for the request."""
 
-    repository = OpportunityRepository(session)
+    repository = OpportunityRepository(
+        session,
+    )
 
-    return OpportunityService(repository)
+    activity_service = ActivityService(
+        repository=ActivityRepository(
+            session,
+        ),
+    )
+
+    automation_dispatcher = AutomationDispatcher()
+
+    automation_dispatcher.register(
+        AutomationEventType.OPPORTUNITY_CREATED,
+        OpportunityCreatedActivityHandler(
+            activity_service=activity_service,
+        ),
+    )
+
+    return OpportunityService(
+        repository=repository,
+        automation_dispatcher=automation_dispatcher,
+    )
 
 
 @router.post(
@@ -67,7 +95,7 @@ async def create_opportunity(
         get_opportunity_service,
     ),
 ):
-    """Create a new opportunity."""
+    """Create an opportunity for the specified organization."""
 
     try:
         return await service.create_opportunity(
@@ -99,7 +127,7 @@ async def list_opportunities(
         get_opportunity_service,
     ),
 ):
-    """List opportunities for an organization."""
+    """List opportunities for the specified organization."""
 
     return await service.list_opportunities(
         organization_id=organization_id,
@@ -118,7 +146,7 @@ async def get_opportunity(
         get_opportunity_service,
     ),
 ):
-    """Get one opportunity."""
+    """Return one opportunity for the specified organization."""
 
     try:
         return await service.get_opportunity(
@@ -143,7 +171,7 @@ async def update_opportunity(
         get_opportunity_service,
     ),
 ):
-    """Update an opportunity."""
+    """Update an opportunity for the specified organization."""
 
     try:
         return await service.update_opportunity(
@@ -173,8 +201,8 @@ async def delete_opportunity(
     service: OpportunityService = Depends(
         get_opportunity_service,
     ),
-) -> None:
-    """Delete an opportunity."""
+) -> Response:
+    """Delete an opportunity for the specified organization."""
 
     try:
         await service.delete_opportunity(
@@ -186,6 +214,10 @@ async def delete_opportunity(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=str(exc),
         ) from exc
+
+    return Response(
+        status_code=status.HTTP_204_NO_CONTENT,
+    )
 
 
 __all__ = [

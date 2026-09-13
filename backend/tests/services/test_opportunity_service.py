@@ -22,6 +22,7 @@ from uuid import uuid4
 
 import pytest
 
+from app.automation import AutomationDispatcher, AutomationEventType
 from app.models.company import Company
 from app.models.contact import Contact
 from app.models.lead import Lead
@@ -64,13 +65,24 @@ def repository():
 
 
 @pytest.fixture
+def automation_dispatcher():
+    """Return a mocked automation dispatcher."""
+
+    return Mock(
+        spec=AutomationDispatcher,
+    )
+
+
+@pytest.fixture
 def service(
     repository,
+    automation_dispatcher,
 ):
     """Return the opportunity service under test."""
 
     return OpportunityService(
         repository=repository,
+        automation_dispatcher=automation_dispatcher,
     )
 
 
@@ -95,6 +107,7 @@ def opportunity(
 async def test_create_opportunity_without_references(
     service,
     repository,
+    automation_dispatcher,
     organization_id,
 ):
     """Creating an opportunity without references should succeed."""
@@ -141,11 +154,24 @@ async def test_create_opportunity_without_references(
 
     repository.session.get.assert_not_awaited()
 
+    automation_dispatcher.dispatch.assert_awaited_once()
+
+    event = automation_dispatcher.dispatch.call_args.args[0]
+
+    assert event.event_type == AutomationEventType.OPPORTUNITY_CREATED
+    assert event.organization_id == organization_id
+    assert event.entity_id == created_opportunity.id
+    assert event.payload["name"] == created_opportunity.name
+    assert event.payload["stage"] == created_opportunity.stage
+    assert event.payload["amount"] == created_opportunity.amount
+    assert event.payload["currency"] == created_opportunity.currency
+
 
 @pytest.mark.asyncio
 async def test_create_opportunity_with_valid_references(
     service,
     repository,
+    automation_dispatcher,
     organization_id,
 ):
     """Creating an opportunity with same-tenant references should succeed."""
@@ -210,11 +236,20 @@ async def test_create_opportunity_with_valid_references(
 
     repository.create.assert_awaited_once()
 
+    automation_dispatcher.dispatch.assert_awaited_once()
+
+    event = automation_dispatcher.dispatch.call_args.args[0]
+
+    assert event.event_type == AutomationEventType.OPPORTUNITY_CREATED
+    assert event.organization_id == organization_id
+    assert event.entity_id == created_opportunity.id
+
 
 @pytest.mark.asyncio
 async def test_create_opportunity_rejects_invalid_lead(
     service,
     repository,
+    automation_dispatcher,
     organization_id,
 ):
     """Creating an opportunity with an invalid lead should fail."""
@@ -239,12 +274,14 @@ async def test_create_opportunity_rejects_invalid_lead(
         )
 
     repository.create.assert_not_awaited()
+    automation_dispatcher.dispatch.assert_not_awaited()
 
 
 @pytest.mark.asyncio
 async def test_create_opportunity_rejects_cross_tenant_company(
     service,
     repository,
+    automation_dispatcher,
     organization_id,
 ):
     """Creating an opportunity with another tenant's company should fail."""
@@ -272,6 +309,7 @@ async def test_create_opportunity_rejects_cross_tenant_company(
         )
 
     repository.create.assert_not_awaited()
+    automation_dispatcher.dispatch.assert_not_awaited()
 
 
 @pytest.mark.asyncio
@@ -363,6 +401,7 @@ async def test_list_opportunities_returns_repository_results(
 async def test_update_opportunity_updates_only_supplied_fields(
     service,
     repository,
+    automation_dispatcher,
     organization_id,
     opportunity,
 ):
@@ -392,6 +431,18 @@ async def test_update_opportunity_updates_only_supplied_fields(
     )
 
     repository.session.get.assert_not_awaited()
+
+    automation_dispatcher.dispatch.assert_awaited_once()
+
+    event = automation_dispatcher.dispatch.call_args.args[0]
+
+    assert event.event_type == AutomationEventType.OPPORTUNITY_UPDATED
+    assert event.organization_id == organization_id
+    assert event.entity_id == opportunity.id
+    assert event.payload["changed_fields"] == [
+        "name",
+        "amount",
+    ]
 
 
 @pytest.mark.asyncio
@@ -441,6 +492,7 @@ async def test_update_opportunity_validates_updated_references(
 async def test_update_opportunity_rejects_invalid_reference(
     service,
     repository,
+    automation_dispatcher,
     organization_id,
     opportunity,
 ):
@@ -466,12 +518,14 @@ async def test_update_opportunity_rejects_invalid_reference(
         )
 
     repository.update.assert_not_awaited()
+    automation_dispatcher.dispatch.assert_not_awaited()
 
 
 @pytest.mark.asyncio
 async def test_update_opportunity_raises_when_not_found(
     service,
     repository,
+    automation_dispatcher,
     organization_id,
 ):
     """Updating a missing opportunity should raise a domain error."""
@@ -495,6 +549,7 @@ async def test_update_opportunity_raises_when_not_found(
         )
 
     repository.update.assert_not_awaited()
+    automation_dispatcher.dispatch.assert_not_awaited()
 
 
 @pytest.mark.asyncio
