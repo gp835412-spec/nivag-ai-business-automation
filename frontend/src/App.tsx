@@ -1,3 +1,10 @@
+import { useState } from 'react'
+import type { FormEvent } from 'react'
+import {
+  apiRequest,
+  getAccessToken,
+  saveAccessToken,
+} from './services/api'
 import './App.css'
 
 const capabilities = [
@@ -34,6 +41,113 @@ const services = [
 ]
 
 function App() {
+  const isCrmPage = window.location.pathname === '/crm'
+
+  const [crmEmail, setCrmEmail] = useState('')
+  const [crmPassword, setCrmPassword] = useState('')
+  const [crmMessage, setCrmMessage] = useState('')
+  const [crmAuthenticated, setCrmAuthenticated] = useState(
+    Boolean(getAccessToken()),
+  )
+
+  const handleCrmLogin = async (
+    event: FormEvent<HTMLFormElement>,
+  ) => {
+    event.preventDefault()
+
+    setCrmMessage('')
+
+    try {
+      const response = await apiRequest<{
+        access_token: string
+        token_type: string
+        user: {
+          id: string
+          organization_id: string
+          email: string
+          first_name: string
+          last_name: string | null
+          phone: string | null
+          role: string
+          status: string
+          is_email_verified: boolean
+        }
+      }>('/auth/login', {
+        method: 'POST',
+        body: JSON.stringify({
+          organization_slug: 'nivag',
+          email: crmEmail.trim(),
+          password: crmPassword,
+        }),
+      })
+
+      saveAccessToken(response.access_token)
+      setCrmAuthenticated(true)
+      setCrmPassword('')
+      setCrmMessage('CRM login successful.')
+    } catch (error) {
+      setCrmAuthenticated(false)
+      setCrmMessage(
+        error instanceof Error
+          ? error.message
+          : 'CRM login failed.',
+      )
+    }
+  }
+
+  const [isSubmitting, setIsSubmitting] = useState(false)
+  const [submitStatus, setSubmitStatus] = useState<
+    'idle' | 'success' | 'error'
+  >('idle')
+  const [submitMessage, setSubmitMessage] = useState('')
+
+  const handleInquirySubmit = async (
+    event: FormEvent<HTMLFormElement>,
+  ) => {
+    event.preventDefault()
+
+    setIsSubmitting(true)
+    setSubmitStatus('idle')
+    setSubmitMessage('')
+
+    const form = event.currentTarget
+    const formData = new FormData(form)
+
+    const payload = {
+      first_name: String(formData.get('first_name') ?? '').trim(),
+      last_name: String(formData.get('last_name') ?? '').trim(),
+      email: String(formData.get('email') ?? '').trim(),
+      phone: String(formData.get('phone') ?? '').trim(),
+      company_name: String(formData.get('company_name') ?? '').trim(),
+      job_title: String(formData.get('job_title') ?? '').trim(),
+      title: String(formData.get('title') ?? '').trim(),
+      description: String(formData.get('description') ?? '').trim(),
+      source: 'NIVAG Portfolio',
+    }
+
+    try {
+      await apiRequest('/public/inquiries', {
+        method: 'POST',
+        body: JSON.stringify(payload),
+      })
+
+      setSubmitStatus('success')
+      setSubmitMessage(
+        'Thank you. Your inquiry has been received. We will get back to you soon.',
+      )
+      form.reset()
+    } catch (error) {
+      setSubmitStatus('error')
+      setSubmitMessage(
+        error instanceof Error
+          ? error.message
+          : 'Something went wrong. Please try again.',
+      )
+    } finally {
+      setIsSubmitting(false)
+    }
+  }
+
   return (
     <div className="site">
       {/* ================= HEADER ================= */}
@@ -43,12 +157,13 @@ function App() {
           <span className="logo-box">N</span>
           <span className="logo-text">NIVAG</span>
         </a>
-
+        
         <nav className="navigation" aria-label="Main navigation">
           <a href="#services">Services</a>
           <a href="#solutions">Solutions</a>
           <a href="#work">Work</a>
           <a href="#about">About</a>
+          <a href="/crm">CRM</a>
         </nav>
 
         <a
@@ -59,6 +174,57 @@ function App() {
           <span>→</span>
         </a>
       </header>
+       {isCrmPage && (
+       <> 
+        <div className="crm-page-header">
+        <p className="eyebrow">NIVAG BUSINESS AUTOMATION</p>
+        <h1>NIVAG CRM</h1>
+        <p>Manage leads, customer relationships and business operations.</p>
+        </div>
+            {crmAuthenticated ? (
+        <div className="crm-auth-status">
+          CRM authenticated
+        </div>
+      ) : (
+        <form
+          className="crm-login-form"
+          onSubmit={handleCrmLogin}
+        >
+          <input
+            type="email"
+            value={crmEmail}
+            onChange={(event) =>
+              setCrmEmail(event.target.value)
+            }
+            placeholder="CRM email"
+            autoComplete="email"
+            required
+          />
+
+          <input
+            type="password"
+            value={crmPassword}
+            onChange={(event) =>
+              setCrmPassword(event.target.value)
+            }
+            placeholder="CRM password"
+            autoComplete="current-password"
+            required
+          />
+
+          <button type="submit">
+            Sign in
+          </button>
+
+          {crmMessage && (
+            <p className="crm-login-message">
+              {crmMessage}
+            </p>
+          )}
+        </form>
+      )}
+        </>
+      )}
 
       <main id="top">
         {/* ================= HERO ================= */}
@@ -678,19 +844,99 @@ function App() {
             </p>
 
             <div className="contact-actions">
-              <a
-                href="mailto:nivagoffical@gmail.com"
-                className="contact-button"
-              >
-                <span>Start a conversation</span>
-                <span>↗</span>
-              </a>
+              <form className="contact-form" onSubmit={handleInquirySubmit}>
+                <div className="contact-form-row">
+                 <input
+                  type="text"
+        name="first_name"
+        placeholder="First name"
+        required
+        autoComplete="given-name"
+      />
 
-              <span className="contact-email">
-                nivagoffical@gmail.com
-              </span>
-            </div>
+      <input
+        type="text"
+        name="last_name"
+        placeholder="Last name"
+        autoComplete="family-name"
+      />
+    </div>
 
+    <div className="contact-form-row">
+      <input
+        type="email"
+        name="email"
+        placeholder="Work email"
+        required
+        autoComplete="email"
+      />
+
+      <input
+        type="tel"
+        name="phone"
+        placeholder="Phone"
+        autoComplete="tel"
+      />
+    </div>
+
+    <div className="contact-form-row">
+      <input
+        type="text"
+        name="company_name"
+        placeholder="Company"
+        autoComplete="organization"
+      />
+
+      <input
+        type="text"
+        name="job_title"
+        placeholder="Your role"
+        autoComplete="organization-title"
+      />
+    </div>
+
+    <input
+      type="text"
+      name="title"
+      placeholder="What would you like to build or improve?"
+      required
+    />
+
+    <textarea
+      name="description"
+      placeholder="Tell us briefly about your requirement..."
+      rows={5}
+    />
+
+    <button
+      type="submit"
+      className="contact-button"
+      disabled={isSubmitting}
+    >
+      <span>
+        {isSubmitting ? 'Sending...' : 'Send inquiry'}
+      </span>
+      <span>↗</span>
+    </button>
+
+    {submitStatus !== 'idle' && (
+      <p
+        className={
+          submitStatus === 'success'
+            ? 'contact-form-message success'
+            : 'contact-form-message error'
+        }
+        role="status"
+      >
+        {submitMessage}
+      </p>
+    )}
+  </form>
+
+  <span className="contact-email">
+    nivagoffical@gmail.com
+  </span>
+</div>
             <div className="contact-trust">
               <span>
                 <i />

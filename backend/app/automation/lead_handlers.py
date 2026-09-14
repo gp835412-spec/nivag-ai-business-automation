@@ -4,18 +4,15 @@ NIVAG AI Business Automation
 
 Lead Automation Handlers
 
-Stateless automation handlers for CRM lead events.
+Automation handlers for CRM lead events.
 
 Responsibilities:
 - React to lead lifecycle events.
 - Create follow-up activities for newly created leads.
-- Acquire a fresh database session per handler execution.
+- Use the request-scoped ActivityService.
 - Preserve organization/tenant isolation.
 - Delegate business validation and persistence to
   ActivityService.
-
-The handler intentionally does not retain a request-scoped
-database session or ActivityService instance.
 
 Author:
 NIVAG
@@ -31,12 +28,10 @@ from app.automation.events import (
     AutomationEvent,
     AutomationEventType,
 )
-from app.db.session.database import AsyncSessionLocal
 from app.models.activity import (
     ActivityStatus,
     ActivityType,
 )
-from app.repositories.activity_repository import ActivityRepository
 from app.schemas.activity.create import ActivityCreate
 from app.services.activity_service import ActivityService
 
@@ -45,12 +40,16 @@ class LeadCreatedActivityHandler:
     """
     Create a follow-up activity when a lead is created.
 
-    The handler is intentionally stateless.
-
-    A fresh AsyncSession is created for every event execution,
-    preventing request-bound database sessions from being
-    retained by the application-level automation dispatcher.
+    The ActivityService is injected so the handler participates
+    in the same database session and transaction as the lead
+    creation operation.
     """
+
+    def __init__(
+        self,
+        activity_service: ActivityService,
+    ) -> None:
+        self._activity_service = activity_service
 
     async def __call__(
         self,
@@ -64,8 +63,6 @@ class LeadCreatedActivityHandler:
 
         if event.event_type is not AutomationEventType.LEAD_CREATED:
             return
-
-        
 
         title = event.payload.get("title")
 
@@ -92,17 +89,10 @@ class LeadCreatedActivityHandler:
             completed_at=None,
         )
 
-        async with AsyncSessionLocal() as session:
-            activity_service = ActivityService(
-                repository=ActivityRepository(session),
-            )
-
-            await activity_service.create_activity(
-                organization_id=event.organization_id,
-                data=activity_data,
-            )
-
-        
+        await self._activity_service.create_activity(
+            organization_id=event.organization_id,
+            data=activity_data,
+        )
 
 
 __all__ = [

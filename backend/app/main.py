@@ -47,6 +47,7 @@ from app.api.v1.organizations import (
 from app.api.v1.users import router as users_router
 from app.core.config import settings
 
+from app.api.v1.public.public_inquiry_route import router as public_inquiry_router
 
 def create_application() -> FastAPI:
     """
@@ -108,6 +109,11 @@ def create_application() -> FastAPI:
     application.include_router(
        activity_router,
        prefix="/api/v1",
+    )
+
+    application.include_router(
+        public_inquiry_router,
+        prefix="/api/v1",
     )
 
     return application
