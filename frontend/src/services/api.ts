@@ -1,4 +1,4 @@
-﻿const API_BASE_URL =
+const API_BASE_URL =
   import.meta.env.VITE_API_BASE_URL ?? "http://127.0.0.1:8000/api/v1";
 
 export async function apiRequest<T>(
@@ -19,16 +19,22 @@ export async function apiRequest<T>(
     ? await response.json()
     : await response.text();
 
-  if (!response.ok) {
+    if (!response.ok) {
     const message =
       typeof data === "object" &&
       data !== null &&
       "detail" in data &&
       typeof data.detail === "string"
         ? data.detail
-        : "Request failed.";
+        : `Request failed with status ${response.status}.`;
 
-    throw new Error(message);
+    const error = new Error(message) as Error & {
+      status?: number;
+    }
+
+    error.status = response.status
+
+    throw error
   }
 
   return data as T;
@@ -110,6 +116,73 @@ export async function getLeads(
   )
 }
 
+export async function getLead(
+  accessToken: string,
+  leadId: string,
+): Promise<Lead> {
+  return apiRequest<Lead>(`/leads/${leadId}`, {
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+    },
+  })
+}
+
+export interface LeadCreateRequest {
+  title: string
+  first_name?: string
+  last_name?: string
+  email?: string
+  phone?: string
+  job_title?: string
+  company_name?: string
+  source?: string
+  status?: string
+  estimated_value?: string
+  currency?: string
+  description?: string
+}
+
+export async function createLead(
+  accessToken: string,
+  payload: LeadCreateRequest,
+): Promise<Lead> {
+  return apiRequest<Lead>('/leads', {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+    },
+    body: JSON.stringify(payload),
+  })
+}
+
+export interface LeadUpdateRequest {
+  title?: string
+  first_name?: string
+  last_name?: string
+  email?: string
+  phone?: string
+  job_title?: string
+  company_name?: string
+  source?: string
+  status?: string
+  estimated_value?: string
+  currency?: string
+  description?: string
+}
+
+export async function updateLead(
+  accessToken: string,
+  leadId: string,
+  payload: LeadUpdateRequest,
+): Promise<Lead> {
+  return apiRequest<Lead>(`/leads/${leadId}`, {
+    method: 'PATCH',
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+    },
+    body: JSON.stringify(payload),
+  })
+}
 
 const ACCESS_TOKEN_KEY = 'nivag_access_token'
 
